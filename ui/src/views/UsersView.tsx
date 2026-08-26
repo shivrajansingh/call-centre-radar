@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { KeyRound, Plus, ShieldCheck, Trash2, UserRound } from "lucide-react";
 import { createUser, fetchUsers, updateUser, type UserRow } from "../api";
 import { useAuth } from "../auth";
-import { Empty, ErrorBox, Modal, Spinner, useToasts } from "../components/ui";
+import { Empty, ErrorBox, Modal, Spinner, useToasts, inputCls, btnPrimary, btnCls } from "../components/ui";
 import { usePageTitle } from "../theme";
 
 const ROLES = [
@@ -11,8 +11,10 @@ const ROLES = [
   { value: "agent", label: "Agent" },
 ];
 
+const thCls = "whitespace-nowrap border-b border-line px-3 py-2.5 text-left text-[11px] font-medium uppercase tracking-wider text-dim";
+const tdCls = "whitespace-nowrap border-b border-line px-3 py-2.5 align-middle";
+
 export default function UsersView() {
-  usePageTitle("Users & roles");
   const [users, setUsers] = useState<UserRow[]>([]);
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(true);
@@ -24,6 +26,7 @@ export default function UsersView() {
   const [busy, setBusy] = useState(false);
   const { me } = useAuth();
   const toasts = useToasts();
+  usePageTitle("Users & roles");
 
   const load = useCallback(() => {
     fetchUsers().then(setUsers).catch(e => setErr(String(e))).finally(() => setLoading(false));
@@ -69,95 +72,106 @@ export default function UsersView() {
   };
 
   return (
-    <div className="page">
+    <div className="flex flex-col gap-4">
       {toasts.node}
-      <div className="page-head">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1>Users & roles</h1>
-          <p className="page-sub">admin · manager · agent — manage access to the system</p>
+          <h1 className="text-[21px] font-bold tracking-tight text-ink">Users & roles</h1>
+          <p className="mt-0.5 text-[13px] text-dim">admin · manager · agent — manage access to the system</p>
         </div>
-        <button className="btn primary sm" onClick={() => setShowModal(true)}><Plus size={15} /> New user</button>
+        <button className={`${btnPrimary} px-3 py-1.5 text-xs`} onClick={() => setShowModal(true)}>
+          <Plus size={15} /> New user
+        </button>
       </div>
 
       {loading ? <Spinner /> : err ? <ErrorBox error={err} /> : users.length === 0 ? <Empty /> : (
-        <div className="card">
-          <table className="tbl">
-            <thead>
-              <tr>
-                <th>Name</th><th>Username</th><th>Role</th><th>Status</th><th>Created</th><th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map(u => (
-                <tr key={u.id}>
-                  <td>
-                    <span className="user-cell">
-                      <UserRound size={15} />
-                      <b>{u.name}</b>
-                      {u.id === me?.id && <span className="chip">you</span>}
-                    </span>
-                  </td>
-                  <td>{u.username}</td>
-                  <td>
-                    <select value={u.role} disabled={u.id === me?.id}
-                      onChange={e => changeRole(u, e.target.value)} className="role-select">
-                      {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-                    </select>
-                  </td>
-                  <td>
-                    <span className={`badge ${u.active ? "resolved" : "unresolved"}`}>
-                      {u.active ? "active" : "disabled"}
-                    </span>
-                  </td>
-                  <td className="dim small">{u.created_at ? new Date(u.created_at * 1000).toLocaleDateString() : "–"}</td>
-                  <td>
-                    <div className="row-actions">
-                      <button className="icon-btn sm" title="Reset password" onClick={() => resetPassword(u)}>
-                        <KeyRound size={14} />
-                      </button>
-                      <button className="icon-btn sm" title={u.active ? "Disable" : "Enable"}
-                        onClick={() => toggleActive(u)}>
-                        <ShieldCheck size={14} />
-                      </button>
-                      {u.id !== me?.id && (
-                        <button className="icon-btn sm danger" title="Disable account" onClick={() => toggleActive(u)}>
-                          <Trash2 size={14} />
-                        </button>
-                      )}
-                    </div>
-                  </td>
+        <div className="rounded-xl border border-line bg-surface shadow-[var(--shadow)]">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[700px] border-collapse text-[13.5px]">
+              <thead>
+                <tr>
+                  <th className={thCls}>Name</th>
+                  <th className={thCls}>Username</th>
+                  <th className={thCls}>Role</th>
+                  <th className={thCls}>Status</th>
+                  <th className={thCls}>Created</th>
+                  <th className={thCls}>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {users.map(u => (
+                  <tr key={u.id} className="transition-colors hover:bg-hover">
+                    <td className={tdCls}>
+                      <span className="inline-flex items-center gap-2">
+                        <UserRound size={15} className="text-dim" />
+                        <b className="text-ink">{u.name}</b>
+                        {u.id === me?.id && <span className="rounded-full border border-accent/20 bg-accent/10 px-2 py-0.5 text-[11px] text-accent">you</span>}
+                      </span>
+                    </td>
+                    <td className={tdCls}><span className="text-dim">{u.username}</span></td>
+                    <td className={tdCls}>
+                      <select value={u.role} disabled={u.id === me?.id}
+                        onChange={e => changeRole(u, e.target.value)}
+                        className="cursor-pointer rounded-md border border-line2 bg-[var(--input)] px-2 py-1 text-xs text-ink focus:border-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-50">
+                        {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                      </select>
+                    </td>
+                    <td className={tdCls}>
+                      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold ${u.active ? "bg-good/15 text-[#6ee7b7]" : "bg-bad/15 text-[#fca5a5]"}`}>
+                        {u.active ? "active" : "disabled"}
+                      </span>
+                    </td>
+                    <td className={tdCls}><span className="text-xs text-dim">{u.created_at ? new Date(u.created_at * 1000).toLocaleDateString() : "–"}</span></td>
+                    <td className={tdCls}>
+                      <div className="flex gap-1.5">
+                        <button className="grid h-6 w-6 place-items-center rounded-md border border-line text-dim transition-colors hover:border-accent hover:text-accent" title="Reset password" onClick={() => resetPassword(u)}>
+                          <KeyRound size={14} />
+                        </button>
+                        <button className="grid h-6 w-6 place-items-center rounded-md border border-line text-dim transition-colors hover:border-accent hover:text-accent" title={u.active ? "Disable" : "Enable"}
+                          onClick={() => toggleActive(u)}>
+                          <ShieldCheck size={14} />
+                        </button>
+                        {u.id !== me?.id && (
+                          <button className="grid h-6 w-6 place-items-center rounded-md border border-line text-dim transition-colors hover:border-bad hover:text-bad" title="Disable account" onClick={() => toggleActive(u)}>
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
       {showModal && (
         <Modal title="Create a user" onClose={() => setShowModal(false)}>
-          <form onSubmit={add} className="modal-form">
-            <label>
+          <form onSubmit={add} className="grid gap-3.5">
+            <label className="grid gap-1.5 text-xs font-semibold text-dim">
               <span>Full name</span>
-              <input autoFocus placeholder="e.g. Dana Price" value={name} onChange={e => setName(e.target.value)} />
+              <input autoFocus className={inputCls} placeholder="e.g. Dana Price" value={name} onChange={e => setName(e.target.value)} />
             </label>
-            <label>
+            <label className="grid gap-1.5 text-xs font-semibold text-dim">
               <span>Username</span>
-              <input placeholder="dana" value={username} onChange={e => setUsername(e.target.value)} />
+              <input className={inputCls} placeholder="dana" value={username} onChange={e => setUsername(e.target.value)} />
             </label>
-            <label>
+            <label className="grid gap-1.5 text-xs font-semibold text-dim">
               <span>Password</span>
-              <input type="password" placeholder="min 6 characters" value={password}
+              <input type="password" className={inputCls} placeholder="min 6 characters" value={password}
                 onChange={e => setPassword(e.target.value)} />
             </label>
-            <label>
+            <label className="grid gap-1.5 text-xs font-semibold text-dim">
               <span>Role</span>
-              <select value={role} onChange={e => setRole(e.target.value)}>
+              <select className="cursor-pointer rounded-lg border border-line2 bg-[var(--input)] px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none"
+                value={role} onChange={e => setRole(e.target.value)}>
                 {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
               </select>
             </label>
-            <div className="modal-actions">
-              <button type="button" className="btn ghost" onClick={() => setShowModal(false)}>Cancel</button>
-              <button className="btn primary" disabled={busy || !name || !username || password.length < 6}>
+            <div className="flex justify-end gap-2.5">
+              <button type="button" className={btnCls} onClick={() => setShowModal(false)}>Cancel</button>
+              <button className={btnPrimary} disabled={busy || !name || !username || password.length < 6}>
                 {busy ? "Creating…" : "Create user"}
               </button>
             </div>

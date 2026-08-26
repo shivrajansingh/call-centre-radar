@@ -1,7 +1,8 @@
 # Dashboard (React SPA)
 
-Stack: React 19 + TypeScript, react-router-dom v7, recharts, lucide-react, Tailwind-free
-hand-rolled CSS (CSS variables, dark/light themes). Built by Vite, served by nginx.
+Stack: React 19 + TypeScript, react-router-dom v7, recharts, lucide-react, **Tailwind CSS v4**
+(`@tailwindcss/vite`; theme tokens in `index.css` map to dark/light CSS variables).
+Built by Vite, served by nginx.
 
 ## Routes
 
@@ -57,22 +58,26 @@ views/              one file per route (see table above)
   list shows all reviews with the current user's deletable.
 - Evidence footer: `citations_verified` % with green/red state.
 
-## Theming
+## Theming & styling
 
-- CSS variables on `:root` (dark, default) and `[data-theme="light"]` overrides —
-  see `index.css`. A no-flash inline script in `index.html` applies the saved theme
-  before first paint.
-- Toggle lives in the topbar (`Sun`/`Moon`, `theme.tsx`), persisted in
-  `localStorage("radar_theme")`.
+- Tailwind v4 `@theme` tokens (`bg-surface`, `text-ink`, `border-line`, `bg-accent`,
+  `text-dim`, …) resolve to CSS variables that flip between dark (default) and
+  `[data-theme="light"]`. A no-flash inline script in `index.html` applies the saved
+  theme before first paint; the topbar toggle persists in `localStorage("radar_theme")`.
+- Only bespoke pieces live outside Tailwind: mood timeline markers, transcript
+  scrollbars/audio chrome, pulse animations.
 - Charts use fixed mood/resolution colors that read well on both themes.
 
 ## Layout & responsiveness
 
-- Fixed sidebar (232 px) + sticky topbar; content max-width 1280 px.
-- Breakpoints: ≤1100 px → KPI grid 2-col, `grid-3` stacks, upload/review layouts stack;
-  ≤800 px → icon-only sidebar, 1-col grids.
-- Tables live in `overflow-x: auto` cards (`:has(.tbl)`), so wide tables scroll inside
-  their card instead of the page (no page-level horizontal scroll).
+- Fixed sidebar (232 px, icon-only ≤800 px) + sticky topbar; content fills the full
+  available width (no max-width cap).
+- KPI grid uses `auto-fit, minmax(230px, 1fr)` so cards wrap instead of stretching.
+- **Tables**: every table sits in an `overflow-x-auto` wrapper with a `min-w` so columns
+  keep comfortable sizing; on narrow screens the table scrolls *inside its card* — the
+  page itself never scrolls horizontally. Long cells (intent, summary) truncate with a
+  `title` tooltip; short cells (dates, badges, durations) stay `whitespace-nowrap` with
+  consistent 12px padding — no column gaps.
 
 ## Adding a page
 

@@ -75,6 +75,26 @@ Notes:
 - The run is safe to interrupt — `analyzed_at` checkpointing picks up where it left.
 - Failed calls are retried on the next run; the exit code is non-zero if anything failed.
 
+## Tests
+
+The suite runs against a dedicated `radar_test` database (auto-created on first run) —
+the real `radar` database is never touched. Requires the docker `db` container (or any
+Postgres reachable at `RADAR_DB_URL`).
+
+```bash
+.venv/bin/pip install -r requirements-dev.txt
+.venv/bin/python -m pytest            # 57 tests, ~10 s
+.venv/bin/python -m pytest tests/test_api.py -k review   # run a subset
+```
+
+| File | Coverage |
+|---|---|
+| `tests/test_citation_verifier.py` | Verbatim/fuzzy quote matching, ±3 s window, unverified flags |
+| `tests/test_ingest.py` | Metadata parsing, upsert & replace storage semantics |
+| `tests/test_asr.py` | Turn merging, ffmpeg speech-interval chunking (needs ffmpeg) |
+| `tests/test_auth.py` | HMAC tokens (tamper/expiry), scrypt password hashing |
+| `tests/test_api.py` | Auth flow, role gating, user CRUD, reviews upsert/delete rules, upload queue, call filters, KPIs, attention ranking |
+
 ## Troubleshooting
 
 | Symptom | Cause / fix |

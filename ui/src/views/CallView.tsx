@@ -11,6 +11,9 @@ import {
   Empty, ErrorBox, MoodBadge, MOOD_COLORS, ResBadge, ScoreBadge, Spinner, StarRating, useToasts,
 } from "../components/ui";
 
+const cardCls = "rounded-xl border border-line bg-surface p-4 shadow-[var(--shadow)]";
+const metaLabel = "min-w-[72px] text-[11px] font-semibold uppercase tracking-wider text-dim";
+
 export default function CallView() {
   const { sid = "" } = useParams();
   const [call, setCall] = useState<CallDetail | null>(null);
@@ -33,91 +36,97 @@ export default function CallView() {
   const seek = makeSeeker();
 
   return (
-    <div className="page">
+    <div className="flex flex-col gap-4">
       {toasts.node}
-      <div className="page-head">
-        <div className="page-head-left">
-          <Link to="/calls" className="btn ghost sm"><ArrowLeft size={14} /> Calls</Link>
-          <div>
-            <h1>
-              <Link to={`/customers/${call.customer_id}`}>{call.customer_name}</Link>
-              <span className="dim"> with </span>
-              <Link to={`/agents/${call.agent_id}`}>{call.agent_name}</Link>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <Link to="/calls" className="inline-flex items-center gap-1 rounded-md border border-line2 px-2.5 py-1 text-xs font-semibold text-dim transition-colors hover:border-accent hover:text-accent">
+            <ArrowLeft size={14} /> Calls
+          </Link>
+          <div className="min-w-0">
+            <h1 className="text-[21px] font-bold tracking-tight text-ink [overflow-wrap:anywhere]">
+              <Link to={`/customers/${call.customer_id}`} className="hover:text-accent">{call.customer_name}</Link>
+              <span className="font-normal text-dim"> with </span>
+              <Link to={`/agents/${call.agent_id}`} className="hover:text-accent">{call.agent_name}</Link>
             </h1>
-            <p className="page-sub">{fmtTime(call.started_at)} · {Math.round(call.duration_s ?? 0)}s · {call.sid}
-              {call.session ? ` · session ${call.session}` : ""}</p>
+            <p className="mt-0.5 text-[13px] text-dim">
+              {fmtTime(call.started_at)} · {Math.round(call.duration_s ?? 0)}s · {call.sid}
+              {call.session ? ` · session ${call.session}` : ""}
+            </p>
           </div>
         </div>
-        <div className="head-badges">
+        <div className="flex flex-wrap items-center gap-2">
           {a && <ScoreBadge score={a.attention_score} />}
           {a && <ResBadge status={a.resolution} />}
         </div>
       </div>
 
-      <div className="grid-3">
-        <div className="card">
-          <h2>Summary</h2>
+      <div className="grid gap-4 xl:grid-cols-3">
+        <div className={cardCls}>
+          <h2 className="mb-3 text-[15px] font-semibold text-ink">Summary</h2>
           {a ? (
             <>
-              <p className="summary">{a.summary}</p>
-              <div className="meta-row">
-                <span className="meta-label">Intent</span>
-                <b>{a.intent_label}</b>
+              <p className="mb-3 leading-relaxed text-ink">{a.summary}</p>
+              <div className="flex flex-wrap items-center gap-2 border-t border-line py-1.5">
+                <span className={metaLabel}>Intent</span>
+                <b className="text-[13.5px] text-ink">{a.intent_label}</b>
                 <Cite cite={a.intent_citation} onSeek={seek} />
               </div>
-              <div className="meta-row">
-                <span className="meta-label">Resolution</span>
+              <div className="flex flex-wrap items-center gap-2 border-t border-line py-1.5">
+                <span className={metaLabel}>Resolution</span>
                 <ResBadge status={a.resolution} />
                 <Cite cite={a.resolution_citation} onSeek={seek} />
               </div>
-              <div className="meta-row">
-                <span className="meta-label">Mood</span>
-                <MoodBadge mood={a.mood_start} /> <span className="dim">→</span> <MoodBadge mood={a.mood_end} />
+              <div className="flex flex-wrap items-center gap-2 border-t border-line py-1.5">
+                <span className={metaLabel}>Mood</span>
+                <MoodBadge mood={a.mood_start} /> <span className="text-dim">→</span> <MoodBadge mood={a.mood_end} />
               </div>
             </>
-          ) : (
-            <AnalysisStatus call={call} onRefresh={reload} />
-          )}
+          ) : <AnalysisStatus call={call} onRefresh={reload} />}
         </div>
 
-        <div className="card">
-          <h2>Mood timeline</h2>
+        <div className={cardCls}>
+          <h2 className="mb-3 text-[15px] font-semibold text-ink">Mood timeline</h2>
           {a ? <MoodTimeline analysis={a} /> : <Empty message="Not available until the analysis completes" />}
         </div>
 
-        <div className="card">
-          <h2>Why it needs attention</h2>
+        <div className={cardCls}>
+          <h2 className="mb-3 text-[15px] font-semibold text-ink">Why it needs attention</h2>
           {a ? (
-            <div className="reason-list">
+            <div className="grid gap-2">
               {(a.attention_reasons || []).map((r, i) => (
-                <div key={i} className="reason-row">
-                  <span className="reason-dot" />
-                  <span className="reason">{r.reason}</span>
+                <div key={i} className="flex items-center gap-2 rounded-lg border border-line bg-deep px-2.5 py-2 text-[13px]">
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-warn" />
+                  <span className="text-ink">{r.reason}</span>
                   <Cite cite={r.citation} onSeek={seek} />
                 </div>
               ))}
-              {!a.attention_reasons?.length && <span className="dim small">No flagged reasons</span>}
+              {!a.attention_reasons?.length && <span className="text-xs text-dim">No flagged reasons</span>}
             </div>
           ) : <Empty message="Not available until the analysis completes" />}
         </div>
       </div>
 
       {call.survey_ease != null || call.survey_partner != null || call.caller_mos != null ? (
-        <div className="card survey-strip">
-          <span className="meta-label">Customer survey</span>
-          <span className="survey-item"><Star size={13} className="star-ic" /> Ease of connection <b>{call.survey_ease ?? "–"}/10</b></span>
-          <span className="survey-item"><Star size={13} className="star-ic" /> Partner rating <b>{call.survey_partner ?? "–"}/10</b></span>
-          <span className="survey-item">MOS <b>{call.caller_mos ?? "–"}</b></span>
+        <div className={`${cardCls} flex flex-wrap items-center gap-4`}>
+          <span className={metaLabel}>Customer survey</span>
+          <span className="inline-flex items-center gap-1.5 text-[13px] text-dim">
+            <Star size={13} className="text-warn" /> Ease of connection <b className="text-ink">{call.survey_ease ?? "–"}/10</b>
+          </span>
+          <span className="inline-flex items-center gap-1.5 text-[13px] text-dim">
+            <Star size={13} className="text-warn" /> Partner rating <b className="text-ink">{call.survey_partner ?? "–"}/10</b>
+          </span>
+          <span className="text-[13px] text-dim">MOS <b className="text-ink">{call.caller_mos ?? "–"}</b></span>
         </div>
       ) : null}
 
       <TranscriptPlayer call={call} />
 
       {a && (
-        <div className="card">
-          <div className="card-head">
-            <h2>QA review</h2>
-            <span className="card-sub">manager review of this call</span>
+        <div className={cardCls}>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-[15px] font-semibold text-ink">QA review</h2>
+            <span className="text-xs text-dim">manager review of this call</span>
           </div>
           <ReviewWidget sid={call.sid} reviews={call.reviews} myReview={myReview} meId={me?.id}
             onChanged={reload} toasts={toasts} />
@@ -125,9 +134,8 @@ export default function CallView() {
       )}
 
       {a && (
-        <div className={`evidence-foot ${a.citations_verified >= 0.9 ? "good" : ""}`}>
-          {a.citations_verified >= 0.9
-            ? <CheckCircle2 size={14} /> : <ShieldAlert size={14} />}
+        <div className={`flex items-center gap-2 rounded-lg border px-3.5 py-2.5 text-xs ${a.citations_verified >= 0.9 ? "border-good/25 bg-good/8 text-good" : "border-bad/25 bg-bad/8 text-bad"}`}>
+          {a.citations_verified >= 0.9 ? <CheckCircle2 size={14} /> : <ShieldAlert size={14} />}
           <span>
             Evidence integrity: {Math.round((a.citations_verified ?? 0) * 100)}% of citations verified verbatim
             against the transcript{a.model ? ` · model ${a.model}` : ""}.
@@ -151,13 +159,14 @@ export function Cite({ cite, onSeek }: { cite?: Citation | null; onSeek?: (t: nu
   if (!cite || !cite.quote) return null;
   const t = cite.t_start ?? 0;
   return (
-    <span
-      className={`cite ${cite.verified === false ? "unverified" : ""}`}
+    <button
+      type="button"
+      className={`ml-auto inline-block max-w-[55%] cursor-pointer truncate align-bottom text-xs text-accent underline decoration-dotted underline-offset-2 hover:underline ${cite.verified === false ? "text-bad" : ""}`}
       title={`“${cite.quote}” @ ${t.toFixed(1)}s${cite.verified === false ? " — quote not verified against transcript" : ""}`}
       onClick={() => onSeek?.(t)}
     >
-      @{t.toFixed(0)}s <q>{cite.quote.slice(0, 48)}{cite.quote.length > 48 ? "…" : ""}</q>
-    </span>
+      @{t.toFixed(0)}s “{cite.quote.slice(0, 48)}{cite.quote.length > 48 ? "…" : ""}”
+    </button>
   );
 }
 
@@ -168,9 +177,9 @@ function MoodTimeline({ analysis }: { analysis: NonNullable<CallDetail["analysis
   const max = Math.max(1, ...tl.map(p => p.t), shift ?? 0);
   return (
     <div>
-      <div className="mood-line">
+      <div className="mb-1.5 flex items-center gap-2">
         <MoodBadge mood={analysis.mood_start} />
-        <span className="dim">→</span>
+        <span className="text-dim">→</span>
         <MoodBadge mood={analysis.mood_end} />
       </div>
       <div className="timeline">
@@ -187,7 +196,7 @@ function MoodTimeline({ analysis }: { analysis: NonNullable<CallDetail["analysis
         )}
       </div>
       {shift != null && analysis.mood_shift_citation && (
-        <p className="small mood-shift-note">
+        <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-dim">
           Shift to <MoodBadge mood={analysis.mood_shift_to ?? undefined} /> at {shift.toFixed(0)}s:
           <Cite cite={analysis.mood_shift_citation} onSeek={seek} />
         </p>
@@ -235,24 +244,29 @@ function TranscriptPlayer({ call }: { call: CallDetail }) {
   const jump = (t: number) => { seek(t); setTime(t); };
 
   return (
-    <div className="card">
-      <div className="card-head">
-        <h2>Recording & transcript</h2>
-        <div className="player-state">
-          <span className={`pulse ${playing ? "on" : ""}`}>{playing ? "Playing" : "Paused"}</span>
-          <span className="dim small">{fmtClock(time)} / {fmtClock(call.duration_s ?? 0)}</span>
+    <div className={cardCls}>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-[15px] font-semibold text-ink">Recording & transcript</h2>
+        <div className="flex items-center gap-2.5">
+          <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${playing ? "text-good" : "text-dim"}`}>
+            <span className={`h-1.5 w-1.5 rounded-full ${playing ? "pulse-dot bg-good" : "bg-line2"}`} />
+            {playing ? "Playing" : "Paused"}
+          </span>
+          <span className="text-xs text-dim">{fmtClock(time)} / {fmtClock(call.duration_s ?? 0)}</span>
         </div>
       </div>
-      <audio ref={audioRef} controls src={audioUrl(call.sid)} style={{ width: "100%" }} preload="metadata" />
+      <audio ref={audioRef} controls src={audioUrl(call.sid)} preload="metadata" />
       <div className="transcript">
         {turns.length === 0 && <Empty message="Transcript not ready yet" />}
         {turns.map((t, i) => (
           <div key={i} ref={i === activeIdx ? activeRef : undefined}
-            className={`turn ${t.speaker} ${i === activeIdx ? "active" : ""}`}
+            className={`flex cursor-pointer gap-2.5 rounded-lg border px-2.5 py-1.5 text-[13.5px] leading-relaxed transition-colors ${t.speaker} ${i === activeIdx ? "active" : ""}`}
             onClick={() => jump(t.start)}>
-            <span className="ts">{t.start.toFixed(1)}s</span>
-            <span className="spk">{t.speaker === "agent" ? "Agent" : "Caller"}</span>
-            <span className="txt">{highlightWords(t, words, wordIdx)}</span>
+            <span className="shrink-0 pt-0.5 text-[11px] text-dim">{t.start.toFixed(1)}s</span>
+            <span className={`w-[58px] shrink-0 pt-0.5 text-[11.5px] font-semibold ${t.speaker === "agent" ? "text-accent" : "text-good"}`}>
+              {t.speaker === "agent" ? "Agent" : "Caller"}
+            </span>
+            <span className="whitespace-pre-wrap text-ink">{highlightWords(t, words, wordIdx)}</span>
           </div>
         ))}
       </div>
@@ -302,28 +316,30 @@ function ReviewWidget({ sid, reviews, myReview, meId, onChanged, toasts }: {
   };
 
   return (
-    <div className="review-layout">
-      <form onSubmit={submit} className="review-form">
-        <div className="review-row">
-          <span className="meta-label">Your rating</span>
+    <div className="grid gap-4 lg:grid-cols-2">
+      <form onSubmit={submit} className="grid content-start gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-dim">Your rating</span>
           <StarRating value={stars} onChange={setStars} size={22} />
-          <span className="dim small">{stars ? `${stars}/5` : "unrated"}</span>
+          <span className="text-xs text-dim">{stars ? `${stars}/5` : "unrated"}</span>
         </div>
         <textarea rows={3} placeholder="Notes for the agent (optional)…" value={note}
-          onChange={e => setNote(e.target.value)} />
-        <button className="btn primary sm" disabled={busy || !canReview}>
+          onChange={e => setNote(e.target.value)}
+          className="w-full resize-y rounded-lg border border-line2 bg-[var(--input)] px-3 py-2 text-sm text-ink placeholder:text-dim/60 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15" />
+        <button className="inline-flex w-fit items-center justify-center gap-1.5 rounded-lg bg-gradient-to-br from-accent to-accent2 px-4 py-1.5 text-xs font-semibold text-white transition hover:brightness-110 disabled:opacity-45 disabled:cursor-not-allowed"
+          disabled={busy || !canReview}>
           {busy ? "Saving…" : myReview ? "Update review" : "Save review"}
         </button>
       </form>
-      <div className="review-list">
+      <div className="grid content-start gap-2">
         {reviews.map(r => (
-          <div key={r.id} className="review-item">
-            <div className="review-item-head">
-              <b>{r.user_name}</b>
+          <div key={r.id} className="rounded-lg border border-line bg-deep px-3 py-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <b className="text-[13px] text-ink">{r.user_name}</b>
               <StarRating value={r.stars} size={13} />
-              <span className="dim small">{new Date(r.created_at * 1000).toLocaleString()}</span>
+              <span className="ml-auto text-xs text-dim">{new Date(r.created_at * 1000).toLocaleString()}</span>
               {r.user_id === meId && (
-                <button className="icon-btn sm" title="Delete review"
+                <button className="grid h-6 w-6 place-items-center rounded-md border border-line text-dim transition-colors hover:border-bad hover:text-bad" title="Delete review"
                   onClick={async () => {
                     try { await deleteReview(sid, r.id); toasts.ok("Review deleted"); onChanged(); }
                     catch (e) { toasts.err(String(e)); }
@@ -332,7 +348,7 @@ function ReviewWidget({ sid, reviews, myReview, meId, onChanged, toasts }: {
                 </button>
               )}
             </div>
-            {r.note && <p className="review-note">{r.note}</p>}
+            {r.note && <p className="mt-1.5 text-[13px] text-dim">{r.note}</p>}
           </div>
         ))}
         {!reviews.length && <Empty message="No QA reviews yet" />}
@@ -354,7 +370,7 @@ function AnalysisStatus({ call, onRefresh }: { call: CallDetail; onRefresh: () =
     "The pipeline hasn't reached this call yet. Run scripts/backfill.py (or backfill.py --uploads for uploaded calls) to process it.";
   if (tx && !an) {
     kind = "queued";
-    icon = <Loader2 size={18} className="spin" />;
+    icon = <Loader2 size={18} className="animate-spin" />;
     title = anErr ? "Analysis failed — will be retried" : "Transcribed — awaiting analysis";
     detail = anErr ? (
       <>
@@ -376,15 +392,19 @@ function AnalysisStatus({ call, onRefresh }: { call: CallDetail; onRefresh: () =
     detail = <><code>{asrErr}</code> — the call will be retried on the next pipeline run.</>;
   }
 
+  const tone = kind === "queued" ? "border-warn/30 bg-warn/8 text-warn"
+    : kind === "failed" ? "border-bad/30 bg-bad/8 text-bad"
+    : "border-accent/30 bg-accent/8 text-accent";
+
   return (
-    <div className={`status-box ${kind}`}>
-      <span className="status-icon">{icon}</span>
-      <div>
-        <b>{title}</b>
-        <p>{detail}</p>
-        <div className="status-actions">
-          <button className="btn ghost sm" onClick={onRefresh}><RefreshCw size={13} /> Refresh</button>
-          {an && <span className="chip ok">analysis complete</span>}
+    <div className={`flex items-start gap-3 rounded-xl border p-3.5 text-[13.5px] ${tone}`}>
+      <span className="mt-0.5 shrink-0">{icon}</span>
+      <div className="min-w-0">
+        <b className="mb-0.5 block text-ink">{title}</b>
+        <p className="m-0 text-xs text-dim">{detail}</p>
+        <div className="mt-2.5 flex flex-wrap gap-2">
+          <button className="inline-flex items-center gap-1.5 rounded-md border border-line2 bg-surface2 px-2.5 py-1 text-xs font-semibold text-ink transition-colors hover:border-accent hover:text-accent"
+            onClick={onRefresh}><RefreshCw size={13} /> Refresh</button>
         </div>
       </div>
     </div>

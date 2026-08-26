@@ -346,38 +346,40 @@ def list_calls(q: str | None = None, agent_id: int | None = None,
 @app.get("/calls/{sid}")
 def get_call(sid: str, user=Depends(require_staff)):
     conn = db.connect()
-    call = conn.execute(
-        """SELECT c.*, cu.name AS customer_name, ag.name AS agent_name
-           FROM calls c
-           JOIN customers cu ON cu.id=c.customer_id
-           JOIN agents ag ON ag.id=c.agent_id
-           WHERE c.sid=%s""", (sid,)
-    ).fetchone()
-    if not call:
-        raise HTTPException(404, "call not found")
-    out = rowd(call)
-    analysis = conn.execute("SELECT * FROM analyses WHERE sid=%s", (sid,)).fetchone()
-    if analysis:
-        a = rowd(analysis)
-        for field in ("intent_citation", "mood_timeline", "mood_shift_citation",
-                      "resolution_citation", "attention_reasons"):
-            if a.get(field):
-                a[field] = json.loads(a[field])
-        out["analysis"] = a
-    out["turns"] = rowsd(conn.execute(
-        'SELECT speaker, "start", "end", text FROM turns WHERE sid=%s ORDER BY "start"', (sid,)
-    ).fetchall())
-    out["words"] = rowsd(conn.execute(
-        'SELECT speaker, "start", "end", text FROM words WHERE sid=%s ORDER BY "start"', (sid,)
-    ).fetchall())
-    out["reviews"] = rowsd(conn.execute(
-        """SELECT r.id, r.sid, r.stars, r.note, r.created_at,
-           u.name AS user_name, u.id AS user_id
-           FROM call_reviews r JOIN users u ON u.id=r.user_id
-           WHERE r.sid=%s ORDER BY r.created_at DESC""", (sid,)
-    ).fetchall())
-    conn.close()
-    return out
+    try:
+        call = conn.execute(
+            """SELECT c.*, cu.name AS customer_name, ag.name AS agent_name
+               FROM calls c
+               JOIN customers cu ON cu.id=c.customer_id
+               JOIN agents ag ON ag.id=c.agent_id
+               WHERE c.sid=%s""", (sid,)
+        ).fetchone()
+        if not call:
+            raise HTTPException(404, "call not found")
+        out = rowd(call)
+        analysis = conn.execute("SELECT * FROM analyses WHERE sid=%s", (sid,)).fetchone()
+        if analysis:
+            a = rowd(analysis)
+            for field in ("intent_citation", "mood_timeline", "mood_shift_citation",
+                          "resolution_citation", "attention_reasons"):
+                if a.get(field):
+                    a[field] = json.loads(a[field])
+            out["analysis"] = a
+        out["turns"] = rowsd(conn.execute(
+            'SELECT speaker, "start", "end", text FROM turns WHERE sid=%s ORDER BY "start"', (sid,)
+        ).fetchall())
+        out["words"] = rowsd(conn.execute(
+            'SELECT speaker, "start", "end", text FROM words WHERE sid=%s ORDER BY "start"', (sid,)
+        ).fetchall())
+        out["reviews"] = rowsd(conn.execute(
+            """SELECT r.id, r.sid, r.stars, r.note, r.created_at,
+               u.name AS user_name, u.id AS user_id
+               FROM call_reviews r JOIN users u ON u.id=r.user_id
+               WHERE r.sid=%s ORDER BY r.created_at DESC""", (sid,)
+        ).fetchall())
+        return out
+    finally:
+        conn.close()
 
 
 @app.get("/calls/{sid}/reviews")
@@ -474,31 +476,33 @@ def create_customer(name: str = Form(...), user=Depends(require_manager)):
 @app.get("/customers/{customer_id}")
 def customer_detail(customer_id: int, user=Depends(require_staff)):
     conn = db.connect()
-    cu = conn.execute("SELECT * FROM customers WHERE id=%s", (customer_id,)).fetchone()
-    if not cu:
-        raise HTTPException(404, "customer not found")
-    stats = rowd(conn.execute(
-        """SELECT COUNT(*) AS call_count,
-           ROUND(AVG(c.duration_s)::numeric, 1)::float8 AS avg_handle_time_s,
-           ROUND(AVG(a.attention_score)::numeric, 1)::float8 AS avg_attention,
-           SUM(CASE WHEN a.resolution='unresolved' THEN 1 ELSE 0 END) AS unresolved_count,
-           SUM(CASE WHEN a.resolution='resolved' THEN 1 ELSE 0 END) AS resolved_count,
-           ROUND(AVG(r.stars)::numeric, 2)::float8 AS avg_review_stars
-           FROM calls c LEFT JOIN analyses a ON a.sid=c.sid
-           LEFT JOIN call_reviews r ON r.sid=c.sid
-           WHERE c.customer_id=%s""", (customer_id,)
-    ).fetchone())
-    calls = rowsd(conn.execute(
-        """SELECT c.sid, c.started_at, c.duration_s,
-           ag.name AS agent_name, ag.id AS agent_id,
-           a.intent_label, a.resolution, a.attention_score,
-           a.summary, a.mood_start, a.mood_end
-           FROM calls c JOIN agents ag ON ag.id=c.agent_id
-           LEFT JOIN analyses a ON a.sid=c.sid
-           WHERE c.customer_id=%s ORDER BY c.started_at DESC""", (customer_id,)
-    ).fetchall())
-    conn.close()
-    return {**rowd(cu), "stats": stats, "calls": calls}
+    try:
+        cu = conn.execute("SELECT * FROM customers WHERE id=%s", (customer_id,)).fetchone()
+        if not cu:
+            raise HTTPException(404, "customer not found")
+        stats = rowd(conn.execute(
+            """SELECT COUNT(*) AS call_count,
+               ROUND(AVG(c.duration_s)::numeric,1)::float8 AS avg_handle_time_s,
+               ROUND(AVG(a.attention_score)::numeric,1)::float8 AS avg_attention,
+               SUM(CASE WHEN a.resolution='unresolved' THEN 1 ELSE 0 END) AS unresolved_count,
+               SUM(CASE WHEN a.resolution='resolved' THEN 1 ELSE 0 END) AS resolved_count,
+               ROUND(AVG(r.stars)::numeric,2)::float8 AS avg_review_stars
+               FROM calls c LEFT JOIN analyses a ON a.sid=c.sid
+               LEFT JOIN call_reviews r ON r.sid=c.sid
+               WHERE c.customer_id=%s""", (customer_id,)
+        ).fetchone())
+        calls = rowsd(conn.execute(
+            """SELECT c.sid, c.started_at, c.duration_s,
+               ag.name AS agent_name, ag.id AS agent_id,
+               a.intent_label, a.resolution, a.attention_score,
+               a.summary, a.mood_start, a.mood_end
+               FROM calls c JOIN agents ag ON ag.id=c.agent_id
+               LEFT JOIN analyses a ON a.sid=c.sid
+               WHERE c.customer_id=%s ORDER BY c.started_at DESC""", (customer_id,)
+        ).fetchall())
+        return {**rowd(cu), "stats": stats, "calls": calls}
+    finally:
+        conn.close()
 
 
 # ---------- attention / trends ----------
@@ -596,31 +600,33 @@ def create_agent(name: str = Form(...), user=Depends(require_manager)):
 @app.get("/agents/{agent_id}")
 def agent_detail(agent_id: int, user=Depends(require_staff)):
     conn = db.connect()
-    ag = conn.execute("SELECT * FROM agents WHERE id=%s", (agent_id,)).fetchone()
-    if not ag:
-        raise HTTPException(404, "agent not found")
-    stats = rowd(conn.execute(
-        """SELECT COUNT(*) AS call_count,
-           ROUND(AVG(c.duration_s)::numeric, 1)::float8 AS avg_handle_time_s,
-           ROUND(AVG(a.attention_score)::numeric, 1)::float8 AS avg_attention,
-           SUM(CASE WHEN a.resolution='resolved' THEN 1 ELSE 0 END) AS resolved_count,
-           SUM(CASE WHEN a.resolution='unresolved' THEN 1 ELSE 0 END) AS unresolved_count,
-           SUM(CASE WHEN a.mood_shift_t IS NOT NULL THEN 1 ELSE 0 END) AS mood_shifts,
-           ROUND(AVG(r.stars)::numeric, 2)::float8 AS avg_review_stars
-           FROM calls c LEFT JOIN analyses a ON a.sid=c.sid
-           LEFT JOIN call_reviews r ON r.sid=c.sid
-           WHERE c.agent_id=%s""", (agent_id,)
-    ).fetchone())
-    known = (stats["resolved_count"] or 0) + (stats["unresolved_count"] or 0)
-    stats["resolution_rate"] = round((stats["resolved_count"] or 0) / known, 2) if known else None
-    calls = rowsd(conn.execute(
-        """SELECT c.sid, c.started_at, c.duration_s,
-           cu.name AS customer_name, cu.id AS customer_id,
-           a.intent_label, a.resolution, a.attention_score,
-           a.summary, a.mood_start, a.mood_end
-           FROM calls c JOIN customers cu ON cu.id=c.customer_id
-           LEFT JOIN analyses a ON a.sid=c.sid
-           WHERE c.agent_id=%s ORDER BY c.started_at DESC""", (agent_id,)
-    ).fetchall())
-    conn.close()
-    return {**rowd(ag), "stats": stats, "calls": calls}
+    try:
+        ag = conn.execute("SELECT * FROM agents WHERE id=%s", (agent_id,)).fetchone()
+        if not ag:
+            raise HTTPException(404, "agent not found")
+        stats = rowd(conn.execute(
+            """SELECT COUNT(*) AS call_count,
+               ROUND(AVG(c.duration_s)::numeric,1)::float8 AS avg_handle_time_s,
+               ROUND(AVG(a.attention_score)::numeric,1)::float8 AS avg_attention,
+               SUM(CASE WHEN a.resolution='resolved' THEN 1 ELSE 0 END) AS resolved_count,
+               SUM(CASE WHEN a.resolution='unresolved' THEN 1 ELSE 0 END) AS unresolved_count,
+               SUM(CASE WHEN a.mood_shift_t IS NOT NULL THEN 1 ELSE 0 END) AS mood_shifts,
+               ROUND(AVG(r.stars)::numeric,2)::float8 AS avg_review_stars
+               FROM calls c LEFT JOIN analyses a ON a.sid=c.sid
+               LEFT JOIN call_reviews r ON r.sid=c.sid
+               WHERE c.agent_id=%s""", (agent_id,)
+        ).fetchone())
+        known = (stats["resolved_count"] or 0) + (stats["unresolved_count"] or 0)
+        stats["resolution_rate"] = round((stats["resolved_count"] or 0) / known, 2) if known else None
+        calls = rowsd(conn.execute(
+            """SELECT c.sid, c.started_at, c.duration_s,
+               cu.name AS customer_name, cu.id AS customer_id,
+               a.intent_label, a.resolution, a.attention_score,
+               a.summary, a.mood_start, a.mood_end
+               FROM calls c JOIN customers cu ON cu.id=c.customer_id
+               LEFT JOIN analyses a ON a.sid=c.sid
+               WHERE c.agent_id=%s ORDER BY c.started_at DESC""", (agent_id,)
+        ).fetchall())
+        return {**rowd(ag), "stats": stats, "calls": calls}
+    finally:
+        conn.close()

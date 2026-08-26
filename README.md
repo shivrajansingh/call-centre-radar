@@ -142,6 +142,17 @@ TRANSCRIPTION_LANGUAGE=en
 Roles: `admin` (everything), `manager` (analytics, upload, QA, register customers/agents),
 `agent` (read-only). Seeded login: **admin / admin123**.
 
+## Tests
+
+```bash
+.venv/bin/pip install -r requirements-dev.txt
+.venv/bin/python -m pytest            # needs the postgres container up (uses a separate radar_test DB)
+```
+
+57 tests: citation verifier, metadata ingestion, ASR turn-merging & chunking, auth
+tokens/passwords, and full API coverage (auth, role gating, reviews, upload queue,
+filters, KPIs). The API tests caught and fixed a real connection-leak bug on 404 paths.
+
 ## Design note: evidence discipline
 
 Every judgment shown in the UI cites a moment in the call. Citations are validated by
