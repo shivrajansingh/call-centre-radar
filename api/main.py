@@ -476,8 +476,11 @@ def create_customer(name: str = Form(...), user=Depends(require_manager)):
     if not name.strip():
         raise HTTPException(400, "name required")
     conn = db.connect()
-    cid = db.upsert_person(conn, "customers", name.strip())
-    conn.close()
+    try:
+        cid = db.upsert_person(conn, "customers", name.strip())
+        conn.commit()
+    finally:
+        conn.close()
     return {"id": cid}
 
 
@@ -600,8 +603,11 @@ def create_agent(name: str = Form(...), user=Depends(require_manager)):
     if not name.strip():
         raise HTTPException(400, "name required")
     conn = db.connect()
-    aid = db.upsert_person(conn, "agents", name.strip())
-    conn.close()
+    try:
+        aid = db.upsert_person(conn, "agents", name.strip())
+        conn.commit()
+    finally:
+        conn.close()
     return {"id": aid}
 
 
