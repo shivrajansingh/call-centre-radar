@@ -3,6 +3,8 @@
 __pycache__/
 *.pyc
 *.log
+.pytest_cache/
+pytest.ini.orig
 
 # Env / secrets
 .env
@@ -17,10 +19,16 @@ ui/node_modules/
 ui/dist/
 e2e/node_modules/
 
-# Tooling
-.playwright-mcp/
+# Playwright
 e2e/test-results/
 e2e/playwright-report/
+e2e/fixtures/e2e-upload-*
+e2e/.last-run.json
+
+# Tooling
+.playwright-mcp/
 .DS_Store
 *.png
 dashboard.png
+*.orig
+*.rej
