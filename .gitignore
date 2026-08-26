@@ -1,0 +1,23 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.log
+
+# Env / secrets
+.env
+
+# Data (audio corpus + database) — provided at run time
+data/
+callradar-data/
+assets/
+
+# Node
+ui/node_modules/
+ui/dist/
+
+# Tooling
+.playwright-mcp/
+.DS_Store
+*.png
+dashboard.png

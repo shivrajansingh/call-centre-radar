@@ -1,0 +1,12 @@
+.venv
+.git
+__pycache__
+*.pyc
+callradar-data
+data
+assets
+.playwright-mcp
+ui/node_modules
+ui/dist
+.env
+*.log
