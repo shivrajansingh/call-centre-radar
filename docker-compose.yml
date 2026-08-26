@@ -1,0 +1,59 @@
+name: callradar
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: radar
+      POSTGRES_PASSWORD: radar
+      POSTGRES_DB: radar
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U radar -d radar"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    restart: unless-stopped
+    environment:
+      RADAR_DB_URL: postgresql://radar:radar@db:5432/radar
+      RADAR_AUDIO_DIR: /data/audio
+      RADAR_DATASET_DIR: /callradar-data
+      AUTH_SECRET: ${AUTH_SECRET:-callradar-dev-secret-change-me}
+      OPENAI_URL: ${OPENAI_URL:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+    ports:
+      - "8100:8100"
+    volumes:
+      - ./data/audio:/data/audio
+      - ./callradar-data:/callradar-data:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request;urllib.request.urlopen('http://localhost:8100/health')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.ui
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
