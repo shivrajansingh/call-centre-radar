@@ -27,7 +27,9 @@ callradar-data/audio/*.mp3 ──► pipeline (ASR + analysis, runs on host) ─
   | `api` | Hosted OpenAI-compatible `/audio/transcriptions` endpoint (OpenRouter, OpenAI, Groq…) | Works on any machine; configured via `TRANSCRIPTION_*` vars; speech chunks are detected with ffmpeg silence detection, transcribed per chunk and stitched with real absolute timestamps (also avoids the 60 s upstream timeout on long clips) |
 - **Analysis** (`pipeline/analyze.py`): one LLM request per transcript returns strict JSON —
   intent, mood timeline, mood-shift moment, resolution, ≤40-word summary, attention score
-  0–100 — every field citing `{t_start, t_end, quote}`.
+  0–100 — every field citing `{t_start, t_end, quote}`. Each call is labelled with a mood
+  (`positive | neutral | concerned | frustrated | angry | anxious`) at start and end, a
+  3–6 point mood timeline, and the moment the mood shifted (with a verbatim quote).
 - **Citation validator**: every returned quote is fuzzy-matched verbatim against the actual
   words near the cited timestamp; failures trigger regeneration; anything unverified is
   flagged and rendered as such in the UI.
