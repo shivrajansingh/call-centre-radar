@@ -1,8 +1,10 @@
 # Pipeline
 
-The pipeline turns raw recordings into judged, citable transcripts. It runs on the host
+The pipeline turns raw recordings into judged, citable transcripts. The **dataset** runs
 as `scripts/backfill.py` (Apple Silicon MLX can't run in Docker; hosted STT keys live in
-`.env`). It is **resumable**: a call is only re-processed when `calls.analyzed_at IS NULL`.
+`.env`). **Uploads** (`POST /ingest`) are processed automatically by an in-process
+background worker (`pipeline/worker.py`) — see [Uploads queue](#uploads-queue). The
+pipeline is **resumable**: a call is only re-processed when `calls.analyzed_at IS NULL`.
 
 ## Stage 0 — Ingest (`pipeline/ingest.py`)
 
@@ -67,7 +69,8 @@ How it works (`transcribe_call_api`):
    - otherwise plain `json` → words are spread evenly within the short chunk
      (approximate but within the citation validator's ±3 s window).
    - the first chunk probes support; subsequent chunks skip unsupported attempts.
-5. Empty chunks (noise-only) are skipped; a channel that yields zero words raises so the
+5. If the provider rejects the `language` hint, the chunk is retried without it.
+6. Empty chunks (noise-only) are skipped; a channel that yields zero words raises so the
    error is recorded in `calls.asr_error`.
 
 Chunking also sidesteps OpenRouter's 60 s upstream timeout on long clips.
@@ -132,16 +135,28 @@ threats/repeats, >85 reserved for serious cases); ≤40-word summary.
 ## Uploads queue
 
 `POST /ingest` (manager+) stores the audio into `data/audio/{sid}.mp3` and creates the
-call record with `source='upload'` — **no transcription happens in the API container**
-(MLX is unavailable there). The host picks it up:
+call record with `source='upload'`. A background worker (`pipeline/worker.py`, started
+with the API unless `UPLOAD_WORKER_ENABLED=0`) polls the queue every
+`UPLOAD_WORKER_POLL_S` seconds and runs transcription + analysis automatically:
+
+1. **Claim** — `UPDATE calls SET upload_claimed_at=now WHERE sid IN (SELECT ... source='upload'
+   AND transcribed_at IS NULL AND upload_attempts < max ...)` — atomic, so multiple API
+   replicas (`uvicorn --workers N`) never double-process a call. Stale claims (a worker
+   dying mid-call) are re-claimable after `UPLOAD_WORKER_STALE_CLAIM_S` (default 15 min).
+2. **Process** — the claimed call runs the full `process_call` (transcribe → analyze),
+   preserving the customer/agent names captured at queue time.
+3. **On failure** — `upload_attempts` increments and the claim is released for retry, up
+   to `UPLOAD_WORKER_MAX_ATTEMPTS` (default 3); the error stays on
+   `calls.asr_error`/`analysis_error`.
+4. `GET /health` reports `upload_worker: {enabled, running, pending, ...}`.
+
+Manual fallback (identical code path) — e.g. local STT while the API runs in Docker,
+where MLX is unavailable; resets `upload_attempts` so failed calls are retried:
 
 ```bash
 PYTHONPATH=. RADAR_DB_URL=postgresql://radar:radar@localhost:5432/radar \
   .venv/bin/python scripts/backfill.py --uploads
 ```
-
-`process_uploads` selects `source='upload' AND transcribed_at IS NULL`, preserving the
-customer/agent names captured at queue time, and processes each one.
 
 ## Dead-letter & retries
 

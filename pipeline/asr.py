@@ -1,3 +1,4 @@
+import logging
 import subprocess
 import tempfile
 from pathlib import Path
@@ -5,6 +6,8 @@ from pathlib import Path
 from openai import OpenAI
 
 from pipeline.config import MLX_MODEL, STT_PROVIDERS, STT_PROVIDER, TURN_GAP_S, stt_api_config
+
+log = logging.getLogger("radar.asr")
 
 
 def split_channels(mp3_path: str, out_dir: str) -> dict:
@@ -112,21 +115,48 @@ def _speech_intervals(wav_path: str, noise: str = "-35dB", min_gap: float = 0.6,
     ]
 
 
+def _plain_text_words(res, wav_path: str, offset: float):
+    """Simple text response: distribute tokens evenly over the chunk window."""
+    text = str(_g(res, "text", "") or "").strip()
+    if not text:
+        return None
+    chunk_len = _ffprobe_duration(wav_path)
+    toks = text.split()
+    n = len(toks)
+    span = max(0.5, chunk_len)
+    return [
+        {"start": offset + span * i / n, "end": offset + span * (i + 1) / n, "text": tok}
+        for i, tok in enumerate(toks)
+    ]
+
+
 def _transcribe_chunk(client, model, language, wav_path: str, offset: float,
                       support_verbose: list) -> list:
     """Transcribe one speech chunk; timestamps are relative to the chunk, so
-    absolute time = offset + relative. Returns [{start, end, text}]."""
+    absolute time = offset + relative. Returns [{start, end, text}].
+
+    Attempts, in order: verbose+language, plain+language, plain (some hosted
+    providers reject the language hint — retry without it).
+    """
     with open(wav_path, "rb") as f:
-        for want_verbose in (support_verbose[0], False):
+        attempts = [(support_verbose[0], True), (False, True)]
+        if language:
+            attempts.append((False, False))
+        last_err = None
+        for want_verbose, with_lang in attempts:
             try:
                 f.seek(0)
-                kwargs = {"model": model, "file": f, "language": language}
+                kwargs = {"model": model, "file": f}
+                if with_lang:
+                    kwargs["language"] = language
                 if want_verbose:
                     kwargs["response_format"] = "verbose_json"
                     kwargs["timestamp_granularities"] = ["word"]
                 res = client.audio.transcriptions.create(**kwargs)
-            except Exception:
+                last_err = None
+            except Exception as e:
                 support_verbose[0] = False
+                last_err = e
                 continue
             if want_verbose:
                 words = list(_g(res, "words", None) or [])
@@ -145,16 +175,11 @@ def _transcribe_chunk(client, model, language, wav_path: str, offset: float,
                     return _words_from_segment_text(
                         segs, "x", offset=offset, fallback_end=offset + (res.duration or 0)
                     )
-            text = str(_g(res, "text", "") or "").strip()
-            if text:
-                chunk_len = _ffprobe_duration(wav_path)
-                toks = text.split()
-                n = len(toks)
-                span = max(0.5, chunk_len)
-                return [
-                    {"start": offset + span * i / n, "end": offset + span * (i + 1) / n, "text": tok}
-                    for i, tok in enumerate(toks)
-                ]
+            plain = _plain_text_words(res, wav_path, offset)
+            if plain:
+                return plain
+        if last_err is not None:
+            log.warning("chunk %s failed all attempts: %s", wav_path, last_err)
     return []  # chunk had no transcribable speech (silence/noise) — skip it
 
 

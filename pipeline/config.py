@@ -9,9 +9,20 @@ CITATION_MIN_RATIO = 0.82
 STT_PROVIDERS = ("local", "api")
 STT_PROVIDER = os.environ.get("STT_PROVIDER", "local").strip().lower()
 
+# Background upload worker: processes calls queued by POST /ingest automatically.
+UPLOAD_WORKER_ENABLED = os.environ.get("UPLOAD_WORKER_ENABLED", "1").strip().lower() not in (
+    "0", "false", "no",
+)
+UPLOAD_WORKER_POLL_S = float(os.environ.get("UPLOAD_WORKER_POLL_S", "5"))
+UPLOAD_WORKER_MAX_ATTEMPTS = int(os.environ.get("UPLOAD_WORKER_MAX_ATTEMPTS", "3"))
+UPLOAD_WORKER_STALE_CLAIM_S = float(os.environ.get("UPLOAD_WORKER_STALE_CLAIM_S", "900"))
+
 
 def load_env(path: str = ".env") -> None:
-    for line in Path(path).read_text().splitlines():
+    env_path = Path(path)
+    if not env_path.exists():
+        return
+    for line in env_path.read_text().splitlines():
         line = line.strip()
         if line and not line.startswith("#") and "=" in line:
             k, v = line.split("=", 1)

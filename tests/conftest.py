@@ -17,6 +17,8 @@ TEST_DB = os.environ.get("RADAR_TEST_DB", "radar_test")
 TEST_DB_URL = f"postgresql://radar:radar@localhost:5432/{TEST_DB}"
 
 os.environ["RADAR_DB_URL"] = TEST_DB_URL
+# keep tests deterministic: the background upload worker must not race uploads
+os.environ["UPLOAD_WORKER_ENABLED"] = "0"
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))

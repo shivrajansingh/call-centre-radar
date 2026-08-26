@@ -24,6 +24,7 @@ Copy `.env.example` → `.env` and fill in:
 | `RADAR_AUDIO_DIR` | api | Where uploads land (`data/audio`) |
 | `RADAR_DATASET_DIR` | api | Dataset audio fallback for streaming |
 | `RADAR_MLX_MODEL` | pipeline | Local whisper model id |
+| `UPLOAD_WORKER_ENABLED` / `UPLOAD_WORKER_POLL_S` / `UPLOAD_WORKER_MAX_ATTEMPTS` | api (`worker.py`) | Background processing of dashboard uploads: on/off, poll interval, retry cap |
 
 ## Deployment (Docker)
 
@@ -63,10 +64,17 @@ PYTHONPATH=. RADAR_DB_URL=postgresql://radar:radar@localhost:5432/radar \
 PYTHONPATH=. STT_PROVIDER=api RADAR_DB_URL=postgresql://radar:radar@localhost:5432/radar \
   .venv/bin/python scripts/backfill.py
 
-# process dashboard uploads
+# process dashboard uploads (fallback — usually processed automatically)
 PYTHONPATH=. RADAR_DB_URL=postgresql://radar:radar@localhost:5432/radar \
   .venv/bin/python scripts/backfill.py --uploads
 ```
+
+Dashboard uploads are normally handled automatically: the API runs a background worker
+(`pipeline/worker.py`) that polls the upload queue every `UPLOAD_WORKER_POLL_S` seconds
+(default 5 s) and transcribes + analyzes each call. `GET /health` shows
+`upload_worker: {enabled, running, pending}`. Disable with `UPLOAD_WORKER_ENABLED=0`
+when the API runs in Docker with `STT_PROVIDER=local` (MLX is unavailable in the
+container) — uploads then stay queued until `backfill.py --uploads` runs on the host.
 
 Notes:
 
@@ -99,7 +107,8 @@ Postgres reachable at `RADAR_DB_URL`).
 
 | Symptom | Cause / fix |
 |---|---|
-| `ModuleNotFoundError: mlx_whisper` inside api container | Expected — ASR never runs in Docker. Uploads are queued; run `backfill.py --uploads` on the host. |
+| `ModuleNotFoundError: mlx_whisper` inside api container | Expected — local ASR never runs in Docker. Use `STT_PROVIDER=api` in compose, or disable the worker (`UPLOAD_WORKER_ENABLED=0`) and run `backfill.py --uploads` on the host. |
+| Upload stuck "pending" in the dashboard | Check `GET /health` → `upload_worker`; a call failing 3× stops being retried (see `calls.asr_error`); reset with `UPDATE calls SET upload_attempts=0 WHERE sid=...` or run `backfill.py --uploads` (resets attempts). |
 | `connection refused: 5432` from the pipeline | Start the db first (`docker compose up -d db`) or point `RADAR_DB_URL` elsewhere. |
 | API health shows `transcribed: null` after empty DB | Stale api image — `docker compose up -d --build api`. |
 | Call shows "analysis pending" forever | Transient LLM failure (`calls.analysis_error`); re-run the pipeline — analysis-only retries are cheap. |
@@ -125,5 +134,5 @@ docker compose exec -T db pg_restore -U radar -d radar < radar-backup.sql   # vi
 4. Mood timeline ⚡ shift marker → jumps to the exact utterance that turned the customer.
 5. Customers → pick a customer with multiple calls → history shows repeated intents.
 6. Agents → compare handle times and resolution rates.
-7. Upload page → drop an MP3 → confirm queued → run `backfill.py --uploads` → the call
-   appears fully analyzed.
+7. Upload page → drop an MP3 → confirm queued → within seconds it is transcribed and
+   analyzed automatically by the upload worker → the call appears fully analyzed.

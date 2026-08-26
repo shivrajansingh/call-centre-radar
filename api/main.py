@@ -11,6 +11,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from api import db
 from pipeline.auth import hash_password, make_token, parse_token, verify_password
+from pipeline.config import UPLOAD_WORKER_ENABLED
 from pipeline.ingest import parse_metadata, process_call
 
 app = FastAPI(title="Call-Centre Radar", version="0.3.0")
@@ -34,6 +35,10 @@ def startup():
         )
         conn.commit()
     conn.close()
+    if UPLOAD_WORKER_ENABLED:
+        from pipeline.worker import start_upload_worker
+
+        start_upload_worker()
 
 
 security = HTTPBearer(auto_error=False)
@@ -163,8 +168,11 @@ def health():
         "COALESCE(SUM(CASE WHEN analyzed_at IS NOT NULL THEN 1 ELSE 0 END),0) AS analyzed "
         "FROM calls"
     ).fetchone())
+    from pipeline.worker import upload_worker_status
+
+    worker = upload_worker_status(conn)
     conn.close()
-    return {"status": "ok", **counts}
+    return {"status": "ok", **counts, "upload_worker": worker}
 
 
 # ---------- kpis ----------

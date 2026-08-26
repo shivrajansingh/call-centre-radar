@@ -6,47 +6,9 @@ from pathlib import Path
 
 from api import db
 from pipeline.ingest import parse_metadata, process_call
+from pipeline.worker import process_uploads
 
 DATA_DIR = Path("callradar-data")
-
-
-def process_uploads(conn):
-    """Transcribe + analyze calls uploaded via the API (source='upload', not yet transcribed).
-
-    Audio lives in the shared audio dir (db.AUDIO_DIR, mounted into the API container).
-    Customer/agent names were captured at queue time — preserve them.
-    """
-    pending = conn.execute(
-        """SELECT c.sid, cu.name AS customer_name, ag.name AS agent_name
-           FROM calls c JOIN customers cu ON cu.id=c.customer_id
-           JOIN agents ag ON ag.id=c.agent_id
-           WHERE c.source='upload' AND c.transcribed_at IS NULL"""
-    ).fetchall()
-    if not pending:
-        print("no pending uploads")
-        return 0, 0
-    ok = fail = 0
-    for r in pending:
-        sid = r["sid"]
-        audio = db.AUDIO_DIR / f"{sid}.mp3"
-        if not audio.exists():
-            print(f"{sid} MISSING AUDIO ({audio})", flush=True)
-            fail += 1
-            continue
-        parsed = {
-            "customer_name": r["customer_name"],
-            "agent_name": r["agent_name"],
-            "started_at": None, "ended_at": None, "session": None,
-            "survey_ease": None, "survey_partner": None, "caller_mos": None,
-        }
-        try:
-            res = process_call(conn, sid, str(audio), parsed, source="upload")
-            ok += 1
-            print(f"{sid} ok turns={res['turns']} cites={res['citations_verified']:.0%}", flush=True)
-        except Exception as e:
-            fail += 1
-            print(f"{sid} FAIL {e}", flush=True)
-    return ok, fail
 
 
 def main():
@@ -61,8 +23,13 @@ def main():
     conn = db.connect()
 
     if args.uploads:
-        ok, fail = process_uploads(conn)
-        print(f"\nuploads done ok={ok} fail={fail}")
+        # manual run: reprocess everything, including calls the background
+        # worker gave up on (e.g. local STT that only runs on the host)
+        conn.execute("UPDATE calls SET upload_attempts=0"
+                     " WHERE source='upload' AND transcribed_at IS NULL")
+        conn.commit()
+        ok, fail, skipped = process_uploads(conn, limit=None, max_attempts=10**9)
+        print(f"\nuploads done ok={ok} fail={fail} skipped={skipped}")
         sys.exit(1 if fail and not ok else 0)
 
     done = {r["sid"] for r in conn.execute(

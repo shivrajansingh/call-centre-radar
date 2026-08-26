@@ -38,7 +38,7 @@ served by nginx.
 | Aggregation | `api/main.py` (`/attention`, `/trending`, `/kpis`, `/agents`) | Recency-weighted attention ranking, intent clustering, SQL rollups |
 | API | `api/main.py`, `api/db.py` | HTTP surface, auth (HMAC tokens), role gating, static audio |
 | Dashboard | `ui/src/**` | React SPA: router, auth, dashboard, calls, customers, agents, upload, users |
-| Orchestration | `scripts/backfill.py` | Resumable batch runner over the dataset + `--uploads` mode |
+| Orchestration | `scripts/backfill.py` | Resumable batch runner over the dataset + `--uploads` mode (same code path as the automatic upload worker) |
 
 ## Key design decisions
 
@@ -53,7 +53,9 @@ served by nginx.
    stored with `verified=false` and rendered in red in the UI — never silently as fact.
 3. **Transcription runs once.** The pipeline checkpoints via `calls.transcribed_at` /
    `calls.analyzed_at`; the API never re-transcribes. Fresh uploads are queued (record +
-   audio stored, no processing) and picked up by `backfill.py --uploads` on the host.
+   audio stored, no processing) and picked up automatically by the in-process upload
+   worker (`pipeline/worker.py`) — or by `backfill.py --uploads` on the host when the
+   worker is disabled (e.g. local STT + API in Docker).
 4. **Two interchangeable STT providers.** `STT_PROVIDER=local` (MLX, Apple Silicon, free,
    offline) or `STT_PROVIDER=api` (any OpenAI-compatible `/audio/transcriptions`
    endpoint). See [pipeline.md](pipeline.md).

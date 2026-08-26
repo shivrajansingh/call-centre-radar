@@ -88,8 +88,10 @@ password, role`). **`PATCH /users/{id}`** (form `active`, `password`, `role`).
 ### Ingest (manager+)
 
 **`POST /ingest`** — multipart: `audio` (file), optional `metadata` (JSON string),
-`caller_name`, `agent_name`. Stores the recording and queues the call (no processing in
-the API container): `{sid, status: "queued"}`. Process later on the host with
+`caller_name`, `agent_name`. Stores the recording and queues the call:
+`{sid, status: "queued"}`. A background worker (see `pipeline/worker.py`,
+`GET /health` → `upload_worker`) picks it up within `UPLOAD_WORKER_POLL_S` seconds and
+transcribes + analyzes it automatically. Fallback when the worker is disabled:
 `scripts/backfill.py --uploads`.
 
 ## Error handling

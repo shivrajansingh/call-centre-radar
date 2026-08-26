@@ -37,7 +37,9 @@ CREATE TABLE IF NOT EXISTS calls(
   transcribed_at REAL,
   analyzed_at REAL,
   asr_error TEXT,
-  analysis_error TEXT
+  analysis_error TEXT,
+  upload_attempts INTEGER DEFAULT 0,
+  upload_claimed_at REAL
 );
 CREATE TABLE IF NOT EXISTS turns(
   id SERIAL PRIMARY KEY,
@@ -98,6 +100,8 @@ def init_db() -> None:
     conn = connect()
     conn.execute(SCHEMA)
     conn.execute("ALTER TABLE calls ADD COLUMN IF NOT EXISTS analysis_error TEXT")
+    conn.execute("ALTER TABLE calls ADD COLUMN IF NOT EXISTS upload_attempts INTEGER DEFAULT 0")
+    conn.execute("ALTER TABLE calls ADD COLUMN IF NOT EXISTS upload_claimed_at REAL")
     conn.commit()
     conn.close()
 

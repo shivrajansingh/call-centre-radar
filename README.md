@@ -59,8 +59,8 @@ docker compose up -d --build
 
 ## Run the transcription + analysis pipeline
 
-The pipeline is resumable — it skips calls that already have an analysis. Pick the STT
-provider via `STT_PROVIDER=local|api` (default `local`):
+Dataset backfill is resumable — it skips calls that already have an analysis.
+Pick the STT provider via `STT_PROVIDER=local|api` (default `local`):
 
 ```bash
 # subset first (sanity check)
@@ -75,10 +75,28 @@ PYTHONPATH=. RADAR_DB_URL=postgresql://radar:radar@localhost:5432/radar \
 PYTHONPATH=. STT_PROVIDER=api RADAR_DB_URL=postgresql://radar:radar@localhost:5432/radar \
   .venv/bin/python scripts/backfill.py
 
-# process recordings uploaded through the dashboard UI
+# process recordings uploaded through the dashboard UI (fallback — see below)
 PYTHONPATH=. RADAR_DB_URL=postgresql://radar:radar@localhost:5432/radar \
   .venv/bin/python scripts/backfill.py --uploads
 ```
+
+### Uploads are processed automatically
+
+`POST /ingest` stores the recording and queues it; a built-in background worker
+(`pipeline/worker.py`, started with the API) picks up the queue every
+`UPLOAD_WORKER_POLL_S` seconds and runs transcription + analysis, so no manual
+step is needed. `GET /health` reports worker status (`upload_worker`).
+
+- Failures are retried up to `UPLOAD_WORKER_MAX_ATTEMPTS` (default 3) with the
+  error stored on `calls.asr_error`/`analysis_error`.
+- Claims are atomic and stale claims (a worker dying mid-call) are re-claimed
+  after 15 min, so multiple API replicas never double-process a call.
+- Disable with `UPLOAD_WORKER_ENABLED=0` (e.g. local STT while the API runs in
+  Docker, where MLX is unavailable) — uploads then stay queued and
+  `scripts/backfill.py --uploads` processes them on the host, as before.
+- Production note: `mlx-whisper` only runs on Apple Silicon, so in Docker use
+  `STT_PROVIDER=api` (OpenRouter etc.) — the API container has both the worker
+  and the hosted-STT client baked in.
 
 ## Development without Docker
 
@@ -105,6 +123,11 @@ TRANSCRIPTION_BASE_URL=https://openrouter.ai/api/v1   # only used with STT_PROVI
 TRANSCRIPTION_API_KEY=sk-or-...
 TRANSCRIPTION_MODEL=nvidia/nemotron-3.5-asr-streaming-multilingual-0.6b
 TRANSCRIPTION_LANGUAGE=en
+
+# --- background upload worker (auto-processes POST /ingest uploads) ---
+UPLOAD_WORKER_ENABLED=1
+UPLOAD_WORKER_POLL_S=5
+UPLOAD_WORKER_MAX_ATTEMPTS=3
 ```
 
 ## API surface
@@ -114,7 +137,7 @@ TRANSCRIPTION_LANGUAGE=en
 | `POST /auth/login` · `GET /auth/me` | Session tokens (HMAC-signed, 7-day TTL) |
 | `GET /users` · `POST /users` · `PATCH /users/{id}` | Admin-only user/role management |
 | `GET /kpis` | Headline KPIs, calls-over-time series, resolution & mood splits |
-| `POST /ingest` | Fresh audio (`audio` file + optional `metadata` JSON / `caller_name` / `agent_name`) → queued for the pipeline |
+| `POST /ingest` | Fresh audio (`audio` file + optional `metadata` JSON / `caller_name` / `agent_name`) → queued, then transcribed + analyzed automatically by the background worker |
 | `GET /calls` | List + search + filters (`resolution`, `min_score`, `agent_id`, `customer_id`, `sort`) + pagination |
 | `GET /calls/{sid}` | Full transcript + analysis + citations + QA reviews |
 | `GET/POST /calls/{sid}/reviews` · `DELETE .../reviews/{rid}` | Manager QA reviews (1–5 stars + note) |
@@ -134,8 +157,8 @@ TRANSCRIPTION_LANGUAGE=en
   (verified quotes in blue, unverified in red), customer-survey scores, QA review widget.
 - **Customers / Agents** — directories with registration, profile pages with stats and
   full call history.
-- **Upload** — drag-and-drop intake for new recordings (managers), processed by
-  `scripts/backfill.py --uploads`.
+- **Upload** — drag-and-drop intake for new recordings (managers); transcribed
+  and analyzed automatically in the background (fallback: `scripts/backfill.py --uploads`).
 - **Users** — admin-only role management (admin / manager / agent); agents get a
   read-only view, managers add uploads + QA reviews.
 

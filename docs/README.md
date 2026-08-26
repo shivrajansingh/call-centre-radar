@@ -31,9 +31,11 @@ judgments, survey scores and QA reviews per call.
 
 ```
 callradar-data/audio/*.mp3 ──► pipeline (host: ASR + LLM analysis) ──► PostgreSQL (docker)
-        (or POST /ingest)            │                                      │
+        (or POST /ingest)            │        ▲                            │
+                                     │        │                            │
+                                     │   upload worker (in-process)        │
                                      └──── scripts/backfill.py ─────────────┘
-                                                                             │
+                                                                              │
         React dashboard (docker) ◄── FastAPI (docker) ◄─────────────────────┘
         :8081                        :8100
 ```
@@ -46,5 +48,6 @@ callradar-data/audio/*.mp3 ──► pipeline (host: ASR + LLM analysis) ──�
 | FastAPI | Docker (`api` service) | `docker compose up -d api` — port 8100 |
 | Dashboard | Docker (`ui` service, nginx) | `docker compose up -d ui` — port 8081 |
 | ASR + analysis pipeline | **host** (MLX is Apple-only; LLM keys live in `.env`) | `scripts/backfill.py` against `localhost:5432` |
+| Upload worker | API container (or host) | Auto-processes `POST /ingest` uploads; disable with `UPLOAD_WORKER_ENABLED=0` |
 
 One command brings up everything: `docker compose up -d --build`.
