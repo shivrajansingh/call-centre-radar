@@ -115,7 +115,7 @@ export default function UploadView() {
           <h2 className="mb-3 text-[15px] font-semibold text-ink">What happens next</h2>
           <ol className="grid list-decimal gap-2.5 pl-5 text-[13px] leading-relaxed text-dim">
             <li><b className="text-ink">Queued</b> — the recording is stored and the call record is created.</li>
-            <li><b className="text-ink">Transcribed</b> — run <code>scripts/backfill.py --uploads</code> to transcribe and analyze.</li>
+            <li><b className="text-ink">Transcribed</b> — automatically transcribed and analyzed in the background.</li>
             <li><b className="text-ink">Reviewed</b> — the call appears in the dashboard with transcript, mood and verdicts.</li>
           </ol>
           {done.length > 0 && (

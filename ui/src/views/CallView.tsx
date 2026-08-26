@@ -367,7 +367,7 @@ function AnalysisStatus({ call, onRefresh }: { call: CallDetail; onRefresh: () =
   let icon: React.ReactNode = <Clock size={18} />;
   let title = "Awaiting transcription";
   let detail: React.ReactNode =
-    "The pipeline hasn't reached this call yet. Run scripts/backfill.py (or backfill.py --uploads for uploaded calls) to process it.";
+    "The pipeline hasn't reached this call yet. Uploads are processed automatically in the background.";
   if (tx && !an) {
     kind = "queued";
     icon = <Loader2 size={18} className="animate-spin" />;
@@ -379,9 +379,8 @@ function AnalysisStatus({ call, onRefresh }: { call: CallDetail; onRefresh: () =
       </>
     ) : (
       <>
-        Transcription is complete, but the analysis step hasn't finished yet. Re-run{" "}
-        <code>scripts/backfill.py</code> to process this call — it will skip the transcription
-        and only complete the analysis.
+        Transcription is complete, but the analysis step hasn't finished yet — it will be
+        completed automatically in the background.
       </>
     );
   }
