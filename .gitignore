@@ -15,9 +15,12 @@ assets/
 # Node
 ui/node_modules/
 ui/dist/
+e2e/node_modules/
 
 # Tooling
 .playwright-mcp/
+e2e/test-results/
+e2e/playwright-report/
 .DS_Store
 *.png
 dashboard.png

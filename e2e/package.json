@@ -1,0 +1,20 @@
+{
+  "name": "callradar-e2e",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Playwright E2E suite for the Call-Centre Radar dashboard (specs written from e2e/test_cases/*.md)",
+  "scripts": {
+    "test": "playwright test",
+    "test:auth": "playwright test tests/auth",
+    "test:dashboard": "playwright test tests/dashboard",
+    "test:calls": "playwright test tests/calls",
+    "test:call-detail": "playwright test tests/call-detail",
+    "test:customers": "playwright test tests/customers",
+    "test:agents": "playwright test tests/agents",
+    "test:upload": "playwright test tests/upload",
+    "test:users": "playwright test tests/users"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1"
+  }
+}
