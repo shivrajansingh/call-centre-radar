@@ -8,8 +8,6 @@ services:
       POSTGRES_USER: radar
       POSTGRES_PASSWORD: radar
       POSTGRES_DB: radar
-    ports:
-      - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -39,8 +37,6 @@ services:
       UPLOAD_WORKER_ENABLED: ${UPLOAD_WORKER_ENABLED:-1}
       UPLOAD_WORKER_POLL_S: ${UPLOAD_WORKER_POLL_S:-5}
       UPLOAD_WORKER_MAX_ATTEMPTS: ${UPLOAD_WORKER_MAX_ATTEMPTS:-3}
-    ports:
-      - "8100:8100"
     volumes:
       - ./data/audio:/data/audio
       - ./callradar-data:/callradar-data:ro
@@ -59,7 +55,7 @@ services:
       dockerfile: Dockerfile.ui
     restart: unless-stopped
     ports:
-      - "8081:80"
+      - "4005:80"
     depends_on:
       - api
 
