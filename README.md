@@ -17,10 +17,43 @@ The stack uses a React dashboard, FastAPI API, PostgreSQL storage, ffmpeg audio 
 
 ## Architecture
 
+```mermaid
+flowchart LR
+    subgraph Sources["Call sources"]
+        Dataset["Dataset recordings<br/>callradar-data/audio/*.mp3"]
+        Upload["New recording<br/>POST /ingest"]
+    end
+
+    subgraph Host["Host pipeline"]
+        Backfill["scripts/backfill.py"]
+        Queue["Upload queue"]
+        ASR["ASR: ffmpeg channel split<br/>+ local MLX Whisper or hosted STT"]
+        Turns["Merge word timestamps<br/>into speaker turns"]
+        Analysis["LLM analysis<br/>intent, mood, resolution, summary, score"]
+        Verify["CitationVerifier<br/>validate timestamped quotes"]
+    end
+
+    subgraph Docker["Docker services"]
+        DB[("PostgreSQL 16<br/>transcripts + analysis + reviews")]
+        API["FastAPI<br/>REST API + upload worker"]
+        UI["React dashboard<br/>nginx :8081"]
+    end
+
+    Dataset --> Backfill --> ASR
+    Upload --> API --> Queue --> ASR
+    ASR --> Turns --> Analysis --> Verify --> DB
+    DB <--> API --> UI
+    DB --> Audio["Audio files served<br/>from data/audio/"] --> UI
+
+    classDef host fill:#fff4d6,stroke:#b7791f,color:#4a2c00
+    classDef docker fill:#e6f4ff,stroke:#2b6cb0,color:#12304a
+    class Backfill,Queue,ASR,Turns,Analysis,Verify host
+    class DB,API,UI,Audio docker
 ```
-callradar-data/audio/*.mp3 ──► pipeline (ASR + analysis, runs on host) ──► PostgreSQL ──► FastAPI ──► React dashboard
-        (or POST /ingest for fresh audio)                                 (docker)      (docker)      (docker)
-```
+
+The pipeline runs on the host because MLX Whisper requires Apple Silicon; PostgreSQL,
+FastAPI, and the dashboard run in Docker. With hosted STT (`STT_PROVIDER=api`), the
+transcription and analysis worker can also run inside the API container.
 
 - **ASR** (`pipeline/asr.py`): stereo recordings are split per channel with ffmpeg
   (left = agent, right = customer → speaker labels are free, no diarization), each channel
