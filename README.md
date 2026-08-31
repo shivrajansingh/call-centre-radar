@@ -1,10 +1,16 @@
 # Call-Centre Radar
 
-Conversation-intelligence system over raw call-centre recordings: speech-to-text with
-speaker separation, per-call judgments (intent, mood + shift point, resolution, summary,
-needs-attention score) where **every claim carries a verbatim, timestamped quote verified
-against the transcript**, plus an admin dashboard (manager queue, trending issues,
-customer histories, agent stats, QA reviews).
+## Summary
+
+Call-Centre Radar is a conversation-intelligence platform for consumer-bank support teams. It turns raw stereo call recordings into searchable, speaker-labelled transcripts with word-level timings, then analyses each conversation for customer intent, mood, mood-shift point, resolution status, a concise summary, and a 0–100 manager-attention score.
+
+Every analysis claim is tied to evidence: a timestamp and verbatim quote from the transcript. Quotes are checked against the recorded words and cited moments can be played directly from the call, making the system useful for accountable reviews rather than opaque AI-generated conclusions.
+
+The dashboard gives managers a ranked attention queue, trending issue clusters, KPI and mood/resolution reporting, agent performance views, customer directories with complete call histories, and detailed call pages with synchronized playback, transcript, mood timeline, citations, survey scores, and QA reviews. Managers can also upload new recordings; a background worker automatically transcribes and analyses them.
+
+The stack uses a React dashboard, FastAPI API, PostgreSQL storage, ffmpeg audio processing, and a resumable Python pipeline. Speech-to-text can run locally with MLX Whisper on Apple Silicon or through a hosted OpenAI-compatible transcription API. Analysis results are stored and served through the API, so calls are not re-transcribed on every request.
+
+**Live demo:** https://call-centre-radar.technicalheist.com/
 
 > Full implementation reference: [docs/](docs/README.md) — architecture, pipeline,
 > database schema, API reference, UI guide, operations.
