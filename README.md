@@ -18,13 +18,15 @@ The stack uses a React dashboard, FastAPI API, PostgreSQL storage, ffmpeg audio 
 ## Architecture
 
 ```mermaid
-flowchart LR
+flowchart TB
     subgraph Sources["Call sources"]
+        direction TB
         Dataset["Dataset recordings<br/>callradar-data/audio/*.mp3"]
         Upload["New recording<br/>POST /ingest"]
     end
 
     subgraph Host["Host pipeline"]
+        direction TB
         Backfill["scripts/backfill.py"]
         Queue["Upload queue"]
         ASR["ASR: ffmpeg channel split<br/>+ local MLX Whisper or hosted STT"]
@@ -34,6 +36,7 @@ flowchart LR
     end
 
     subgraph Docker["Docker services"]
+        direction TB
         DB[("PostgreSQL 16<br/>transcripts + analysis + reviews")]
         API["FastAPI<br/>REST API + upload worker"]
         UI["React dashboard<br/>nginx :8081"]
@@ -42,7 +45,7 @@ flowchart LR
     Dataset --> Backfill --> ASR
     Upload --> API --> Queue --> ASR
     ASR --> Turns --> Analysis --> Verify --> DB
-    DB <--> API --> UI
+    DB --> API --> UI
     DB --> Audio["Audio files served<br/>from data/audio/"] --> UI
 
     classDef host fill:#fff4d6,stroke:#b7791f,color:#4a2c00
