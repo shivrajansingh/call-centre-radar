@@ -101,6 +101,18 @@ docker compose up -d --build
 .venv/bin/python scripts/migrate_sqlite.py data/radar.db
 ```
 
+On a deployment host, run the published images instead of building:
+
+```bash
+docker compose pull
+docker compose up -d --no-build
+```
+
+Images are published multi-arch (`linux/amd64` + `linux/arm64`) to
+`registry.gitlab.com/shivrajansingh/call-centre-radar`. The Buildx publish recipe —
+including the Apple Silicon `no matching manifest for linux/amd64` pitfall — is in
+[docs/operations.md](docs/operations.md).
+
 ## Run the transcription + analysis pipeline
 
 Dataset backfill is resumable — it skips calls that already have an analysis.
@@ -161,6 +173,13 @@ OPENAI_URL=https://your-gateway/v1/chat/completions   # full endpoint or base UR
 OPENAI_API_KEY=sk-...
 OPENAI_MODEL=your-model-name
 
+# --- OpenCode Zen / Go session routing (optional) ---
+# x-opencode-session keeps one conversation pinned to one backend (warm prompt
+# cache); sent automatically to opencode.ai hosts. `always` covers a proxy.
+# OPENCODE_SESSION_MODE=auto
+# OPENCODE_CLIENT=call-centre-radar
+# OPENCODE_SESSION_ID=
+
 # --- speech-to-text: local (default) or hosted API ---
 STT_PROVIDER=local
 TRANSCRIPTION_BASE_URL=https://openrouter.ai/api/v1   # only used with STT_PROVIDER=api
@@ -216,9 +235,10 @@ Roles: `admin` (everything), `manager` (analytics, upload, QA, register customer
 .venv/bin/python -m pytest            # needs the postgres container up (uses a separate radar_test DB)
 ```
 
-57 tests: citation verifier, metadata ingestion, ASR turn-merging & chunking, auth
-tokens/passwords, and full API coverage (auth, role gating, reviews, upload queue,
-filters, KPIs). The API tests caught and fixed a real connection-leak bug on 404 paths.
+69 tests: citation verifier, metadata ingestion, ASR turn-merging & chunking, auth
+tokens/passwords, OpenCode session-header routing, and full API coverage (auth, role
+gating, reviews, upload queue, filters, KPIs). The API tests caught and fixed a real
+connection-leak bug on 404 paths.
 
 ## Design note: evidence discipline
 

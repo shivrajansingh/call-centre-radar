@@ -134,7 +134,7 @@ def process_call(conn, sid: str, audio_path: str, parsed: dict, source="dataset"
         words, turns = transcript["words"], transcript["turns"]
 
     try:
-        analysis_result = analyze.analyze_call(turns, words)
+        analysis_result = analyze.analyze_call(turns, words, session_id=sid)
     except Exception as e:
         conn.execute("UPDATE calls SET analysis_error=%s WHERE sid=%s",
                      (f"{type(e).__name__}: {e}", sid))

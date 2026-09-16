@@ -17,6 +17,7 @@ services:
       retries: 10
 
   api:
+    image: ${RADAR_REGISTRY:-registry.gitlab.com/shivrajansingh/call-centre-radar}/callradar-api:${RADAR_TAG:-latest}
     build:
       context: .
       dockerfile: Dockerfile.api
@@ -50,6 +51,7 @@ services:
       retries: 10
 
   ui:
+    image: ${RADAR_REGISTRY:-registry.gitlab.com/shivrajansingh/call-centre-radar}/callradar-ui:${RADAR_TAG:-latest}
     build:
       context: .
       dockerfile: Dockerfile.ui

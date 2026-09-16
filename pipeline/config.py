@@ -1,5 +1,7 @@
 import os
+import uuid
 from pathlib import Path
+from urllib.parse import urlparse
 
 MLX_MODEL = os.environ.get("RADAR_MLX_MODEL", "mlx-community/whisper-large-v3-turbo")
 TURN_GAP_S = 0.8
@@ -42,6 +44,35 @@ def openai_config() -> dict:
         "base_url": url or None,
         "api_key": os.environ.get("OPENAI_API_KEY", "missing"),
         "model": os.environ.get("OPENAI_MODEL", "gpt-4o-mini"),
+    }
+
+
+_PROCESS_SESSION_ID = f"radar-{os.getpid()}-{uuid.uuid4().hex[:12]}"
+
+
+def _fallback_session_id() -> str:
+    return os.environ.get("OPENCODE_SESSION_ID", "").strip() or _PROCESS_SESSION_ID
+
+
+def opencode_headers(session_id: str | None = None) -> dict:
+    """Headers for OpenCode Zen/Go prompt-cache routing.
+
+    A stable session id per conversation pins its requests to one backend and
+    keeps the prompt cache warm; the per-process fallback covers calls made
+    outside a conversation (no fresh id per request). Mode `auto` (default)
+    sends only to opencode.ai hosts, `always` also through a proxy, `never`
+    disables the headers.
+    """
+    mode = os.environ.get("OPENCODE_SESSION_MODE", "auto").strip().lower()
+    if mode == "never":
+        return {}
+    if mode != "always":
+        host = urlparse(openai_config()["base_url"] or "").hostname or ""
+        if host != "opencode.ai" and not host.endswith(".opencode.ai"):
+            return {}
+    return {
+        "x-opencode-session": session_id or _fallback_session_id(),
+        "x-opencode-client": os.environ.get("OPENCODE_CLIENT", "call-centre-radar").strip(),
     }
 
 

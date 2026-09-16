@@ -6,7 +6,12 @@ from difflib import SequenceMatcher
 
 from openai import OpenAI
 
-from pipeline.config import CITATION_MIN_RATIO, CITATION_WINDOW_S, openai_config
+from pipeline.config import (
+    CITATION_MIN_RATIO,
+    CITATION_WINDOW_S,
+    openai_config,
+    opencode_headers,
+)
 
 MOODS = ["positive", "neutral", "concerned", "frustrated", "angry", "anxious"]
 
@@ -178,8 +183,10 @@ def _fixup(data: dict, verifier: CitationVerifier) -> dict:
     return data
 
 
-def analyze_call(turns: list, words: list, max_retries: int = 2) -> dict:
+def analyze_call(turns: list, words: list, max_retries: int = 2,
+                 session_id: str | None = None) -> dict:
     client, model = _client()
+    headers = opencode_headers(session_id)
     verifier = CitationVerifier(words)
     transcript = _transcript_for_prompt(turns)
     feedback = ""
@@ -195,6 +202,7 @@ def analyze_call(turns: list, words: list, max_retries: int = 2) -> dict:
                 {"role": "user", "content": user_msg},
             ],
             temperature=0,
+            extra_headers=headers,
         )
         try:
             data = _extract_json(resp.choices[0].message.content)

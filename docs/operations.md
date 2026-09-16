@@ -16,6 +16,7 @@ Copy `.env.example` → `.env` and fill in:
 | Var | Used by | Purpose |
 |---|---|---|
 | `OPENAI_URL` / `OPENAI_API_KEY` / `OPENAI_MODEL` | pipeline (`analyze.py`) | Analysis LLM gateway |
+| `OPENCODE_SESSION_MODE` / `OPENCODE_CLIENT` / `OPENCODE_SESSION_ID` | pipeline (`analyze.py`) | OpenCode Zen/Go session routing: `auto` (default, opencode.ai hosts only), `always` (proxy in front of the gateway), `never`; client name sent as `x-opencode-client`; stable batch id |
 | `STT_PROVIDER` | pipeline (`asr.py`) | `local` (MLX) or `api` (hosted) |
 | `TRANSCRIPTION_BASE_URL` / `TRANSCRIPTION_API_KEY` / `TRANSCRIPTION_MODEL` / `TRANSCRIPTION_LANGUAGE` | pipeline (`asr.py`, api mode) | Hosted STT |
 | `HF_TOKEN` | pipeline | Speeds up mlx-whisper model download |
@@ -23,6 +24,7 @@ Copy `.env.example` → `.env` and fill in:
 | `RADAR_DB_URL` | everything | Postgres DSN (compose sets it for the api container) |
 | `RADAR_AUDIO_DIR` | api | Where uploads land (`data/audio`) |
 | `RADAR_DATASET_DIR` | api | Dataset audio fallback for streaming |
+| `RADAR_REGISTRY` / `RADAR_TAG` | compose | Image namespace/tag for `pull` (defaults to `registry.gitlab.com/shivrajansingh/call-centre-radar` / `latest`) |
 | `RADAR_MLX_MODEL` | pipeline | Local whisper model id |
 | `UPLOAD_WORKER_ENABLED` / `UPLOAD_WORKER_POLL_S` / `UPLOAD_WORKER_MAX_ATTEMPTS` | api (`worker.py`) | Background processing of dashboard uploads: on/off, poll interval, retry cap |
 
@@ -40,6 +42,50 @@ docker compose up -d --build
 
 First boot: schema created + `admin/admin123` seeded by the API. Change the password on
 the Users page.
+
+### Publish multi-arch images (Apple Silicon → linux/amd64 host)
+
+`docker build` builds for the builder's own platform, so an Apple Silicon Mac
+publishes arm64-only images and a linux/amd64 host fails to pull with
+`no matching manifest for linux/amd64`. Build and push a manifest list with Buildx
+instead (`docker compose build` cannot produce multi-arch images):
+
+```bash
+docker login registry.gitlab.com
+
+docker buildx build --platform linux/amd64,linux/arm64 --provenance=false \
+  -f Dockerfile.api \
+  -t registry.gitlab.com/shivrajansingh/call-centre-radar/callradar-api:latest \
+  --push .
+
+docker buildx build --platform linux/amd64,linux/arm64 --provenance=false \
+  -f Dockerfile.ui \
+  -t registry.gitlab.com/shivrajansingh/call-centre-radar/callradar-ui:latest \
+  --push .
+```
+
+- `--push` publishes both platforms (multi-arch images cannot be `--load`ed locally).
+- `--provenance=false` keeps `unknown/unknown` attestation entries out of the manifest list.
+- Deploying to amd64 only? Drop `--platform linux/amd64,linux/arm64` to `--platform linux/amd64`.
+- Override the namespace/tag with `RADAR_REGISTRY` / `RADAR_TAG`; the compose services keep
+  both `image:` (what `pull` fetches) and `build:` (what `up --build` builds and tags).
+- The builder needs emulation for the foreign platform; `docker buildx inspect --bootstrap`
+  must list `linux/amd64` under supported platforms (Docker Desktop ships QEMU).
+
+### Deploy from the registry
+
+```bash
+docker compose pull
+docker compose up -d --no-build
+```
+
+`--no-build` uses exactly the pulled images; without it a missing tag makes compose
+build from whatever source is on the host. Verify a published image lists both
+platforms:
+
+```bash
+docker buildx imagetools inspect registry.gitlab.com/shivrajansingh/call-centre-radar/callradar-api:latest
+```
 
 ### Ports
 
@@ -91,7 +137,7 @@ Postgres reachable at `RADAR_DB_URL`).
 
 ```bash
 .venv/bin/pip install -r requirements-dev.txt
-.venv/bin/python -m pytest            # 57 tests, ~10 s
+.venv/bin/python -m pytest            # 69 tests, ~10 s
 .venv/bin/python -m pytest tests/test_api.py -k review   # run a subset
 ```
 
@@ -101,6 +147,7 @@ Postgres reachable at `RADAR_DB_URL`).
 | `tests/test_ingest.py` | Metadata parsing, upsert & replace storage semantics |
 | `tests/test_asr.py` | Turn merging, ffmpeg speech-interval chunking (needs ffmpeg) |
 | `tests/test_auth.py` | HMAC tokens (tamper/expiry), scrypt password hashing |
+| `tests/test_opencode_session.py` | OpenCode routing headers: opencode.ai host match, proxy `always`/`never`, stable per-process fallback id, one session id across analysis retries |
 | `tests/test_api.py` | Auth flow, role gating, user CRUD, reviews upsert/delete rules, upload queue, call filters, KPIs, attention ranking |
 
 ## Troubleshooting
@@ -116,6 +163,8 @@ Postgres reachable at `RADAR_DB_URL`).
 | Slow first MLX run | Model download; set `HF_TOKEN` to speed it up. |
 | `STT_PROVIDER=api` returns nothing | Check `TRANSCRIPTION_BASE_URL` (full endpoint or base URL both accepted), key, and model slug; model must support `/audio/transcriptions`. |
 | "duplicate key value violates unique constraint ... pkey" after migration | Run the sequence reset (included in `migrate_sqlite.py`) — `SELECT setval(pg_get_serial_sequence(t, 'id'), COALESCE(MAX(id),1)) FROM t` per table. |
+| `Request is missing x-opencode-session and cannot be routed efficiently` | OpenCode Zen/Go routing header is missing. The pipeline sends it automatically when `OPENAI_URL` points at opencode.ai (`OPENCODE_SESSION_MODE=auto`). If a proxy sits in front of the gateway, set `OPENCODE_SESSION_MODE=always`. |
+| `no matching manifest for linux/amd64 in the manifest list entries` when pulling | Images were pushed from an Apple Silicon Mac with a plain `docker build` — the manifest is arm64-only. Rebuild and push with Buildx (see "Publish multi-arch images") and confirm the manifest lists `linux/amd64` via `docker buildx imagetools inspect <image>`. |
 
 ## Backup & restore
 
