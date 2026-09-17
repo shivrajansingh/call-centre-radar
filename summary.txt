@@ -1,0 +1,68 @@
+LIVE DEMO: https://call-centre-radar.technicalheist.com/
+
+CALL-CENTRE RADAR
+
+WHAT IT DOES
+
+Call-Centre Radar is a conversation-intelligence system for consumer-bank support calls.
+It takes stereo call recordings where the left channel is the agent and the right channel
+is the customer. The system produces searchable transcripts with speaker labels, word-level
+timings, and reconstructed conversation turns.
+
+Each call is analysed for:
+- Customer intent
+- Starting and ending mood
+- The point where the mood shifted
+- Resolution status
+- A summary of no more than 40 words
+- A needs-attention score from 0 to 100
+
+Every judgement includes evidence: a timestamp and quote from the call. The citation
+validator checks quotes against nearby transcript words before they are stored. The UI lets
+managers play cited moments directly from the recording.
+
+The dashboard includes a ranked manager-attention queue, trending issues, KPI charts,
+mood and resolution breakdowns, agent volumes and handle times, customer directories and
+full call histories, call detail pages, synchronized audio/transcript playback, mood
+timelines, customer surveys, and QA reviews. Managers can upload new recordings, which are
+processed automatically by the background worker.
+
+HOW TO RUN
+
+Requirements: Docker Desktop, ffmpeg, Python 3.12, and Node 18+.
+
+1. Install ffmpeg if needed:
+   brew install ffmpeg
+2. Start PostgreSQL, the API, and the dashboard:
+   docker compose up -d --build
+3. Open the dashboard at http://localhost:8081.
+4. The API is available at http://localhost:8100.
+5. Sign in with admin / admin123, then change the password from the Users page.
+
+To install host pipeline dependencies:
+   python3.12 -m venv .venv
+   .venv/bin/pip install -r requirements.txt
+
+To process a small dataset sample:
+   PYTHONPATH=. RADAR_DB_URL=postgresql://radar:radar@localhost:5432/radar \
+     .venv/bin/python scripts/backfill.py --limit 50
+
+To process all 1,441 dataset calls:
+   PYTHONPATH=. RADAR_DB_URL=postgresql://radar:radar@localhost:5432/radar \
+     .venv/bin/python scripts/backfill.py
+
+The backfill is resumable and skips calls that already have an analysis. Use
+STT_PROVIDER=local for local MLX Whisper on Apple Silicon, or STT_PROVIDER=api for a
+hosted OpenAI-compatible transcription service configured with TRANSCRIPTION_* variables.
+The upload worker processes recordings submitted through POST /ingest automatically. Set
+UPLOAD_WORKER_ENABLED=0 if uploads should be processed later with scripts/backfill.py
+--uploads.
+
+IMPORTANT POINTS
+
+- PostgreSQL is the persistent store; analysis is not regenerated on every API request.
+- Audio remains on disk and is served through the API.
+- Local MLX transcription is Apple-Silicon-only. Hosted STT works on other machines.
+- The API supports authentication and admin, manager, and read-only agent roles.
+- Do not commit .env files or API keys.
+- Detailed architecture, pipeline, schema, API, UI, and operations documentation is in docs/.
